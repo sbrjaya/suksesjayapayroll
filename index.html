@@ -1553,27 +1553,29 @@
 
             // Calculate PPh21 based on status
             let pph21Monthly = 0;
+            let yearlyNet = 0;
+            let pkp = 0;
             
             if (pph21Status === 'yes') {
                 // Calculate net income for PPh21
                 const monthlyNet = grossSalary - totalBpjs;
-                const yearlyNet = monthlyNet * 12;
+                yearlyNet = monthlyNet * 12;
 
                 // Get employee PTKP and NPWP status
                 const employeeId = document.getElementById('salaryEmployee').value;
-                let ptkp = 54000000; // Default TK/0
+                let ptkp_value = 54000000; // Default TK/0
                 let hasNpwp = false;
 
                 if (employeeId) {
                     const employee = employees.find(emp => emp.id == employeeId);
                     if (employee) {
-                        ptkp = ptkpValues[employee.ptkpStatus] || 54000000;
+                        ptkp_value = ptkpValues[employee.ptkpStatus] || 54000000;
                         hasNpwp = employee.npwp && employee.npwp.trim() !== '';
                     }
                 }
 
                 // Calculate PKP (Penghasilan Kena Pajak)
-                const pkp = Math.max(0, yearlyNet - ptkp);
+                pkp = Math.max(0, yearlyNet - ptkp_value);
 
                 // Calculate PPh21
                 let pph21Annual = 0;
@@ -1595,11 +1597,17 @@
                 }
 
                 pph21Monthly = pph21Annual / 12;
+            } else {
+                // When PPh21 is not applicable, set all values to 0
+                pph21Monthly = 0;
+                yearlyNet = 0;
+                pkp = 0;
             }
 
             // Calculate employee debts
             let totalDebtAmount = 0;
             const debtBreakdown = document.getElementById('debtBreakdown');
+            const employeeId = document.getElementById('salaryEmployee').value;
             
             if (employeeId) {
                 const employeeDebts = debts.filter(d => d.employeeId == employeeId && d.status === 'aktif');
@@ -2001,126 +2009,202 @@
                 return;
             }
 
-            const { jsPDF } = window.jsPDF;
-            const doc = new jsPDF();
-            
-            const { employee, salary } = currentPayslipData;
-            const monthName = new Date(salary.month + '-01').toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
-            
-            // Header
-            doc.setFontSize(18);
-            doc.setFont(undefined, 'bold');
-            doc.text(employee.company, 105, 20, { align: 'center' });
-            doc.setFontSize(14);
-            doc.text('SLIP GAJI KARYAWAN', 105, 30, { align: 'center' });
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'normal');
-            doc.text(`Periode: ${monthName}`, 105, 40, { align: 'center' });
-            
-            if (salary.isJuly2025) {
-                doc.setFontSize(10);
-                doc.setTextColor(255, 165, 0);
-                doc.text('* Khusus Juli 2025: Tanpa Potongan BPJS', 105, 50, { align: 'center' });
-                doc.setTextColor(0, 0, 0);
-            }
-            
-            // Employee Info
-            doc.setFontSize(10);
-            let y = salary.isJuly2025 ? 70 : 60;
-            doc.text(`Nama: ${employee.fullName}`, 20, y);
-            doc.text(`Jabatan: ${employee.position}`, 20, y + 10);
-            doc.text(`NIK: ${employee.nik}`, 20, y + 20);
-            doc.text(`Status PTKP: ${employee.ptkpStatus}`, 20, y + 30);
-            doc.text(`Bank: ${employee.bankName}`, 120, y);
-            doc.text(`No. Rekening: ${employee.accountNumber}`, 120, y + 10);
-            doc.text(`PPh 21: ${salary.pph21Status === 'yes' ? 'Berlaku' : 'Tidak Berlaku'}`, 120, y + 20);
-            
-            // Address (split into multiple lines if too long)
-            const address = employee.address || '-';
-            const addressLines = doc.splitTextToSize(`Alamat: ${address}`, 170);
-            doc.text(addressLines, 20, y + 40);
-            
-            // Table
-            y += 60;
-            doc.setFont(undefined, 'bold');
-            doc.text('PENGHASILAN', 20, y);
-            doc.line(20, y + 2, 190, y + 2);
-            
-            y += 10;
-            doc.setFont(undefined, 'normal');
-            doc.text('Gaji Pokok', 20, y);
-            doc.text(formatCurrency(salary.basicSalary), 150, y, { align: 'right' });
-            
-            y += 8;
-            doc.text('Tunjangan Tetap', 20, y);
-            doc.text(formatCurrency(salary.allowance), 150, y, { align: 'right' });
-            
-            y += 8;
-            doc.text('Bonus/Lembur', 20, y);
-            doc.text(formatCurrency(salary.bonus), 150, y, { align: 'right' });
-            
-            y += 10;
-            doc.setFont(undefined, 'bold');
-            doc.text('Total Penghasilan Bruto', 20, y);
-            doc.text(formatCurrency(salary.calculations.grossSalary), 150, y, { align: 'right' });
-            doc.line(20, y + 2, 190, y + 2);
-            
-            y += 15;
-            doc.text('POTONGAN', 20, y);
-            doc.line(20, y + 2, 190, y + 2);
-            
-            y += 10;
-            doc.setFont(undefined, 'normal');
-            if (!salary.isJuly2025) {
-                doc.text('BPJS JHT (2%)', 20, y);
-                doc.text(`(${formatCurrency(salary.calculations.jht)})`, 150, y, { align: 'right' });
+            try {
+                const { jsPDF } = window.jsPDF;
+                const doc = new jsPDF('p', 'mm', 'a4');
                 
-                y += 8;
-                doc.text('BPJS Kesehatan (1%)', 20, y);
-                doc.text(`(${formatCurrency(salary.calculations.health)})`, 150, y, { align: 'right' });
-            } else {
-                doc.text('BPJS (Khusus Juli 2025)', 20, y);
-                doc.text('Rp 0', 150, y, { align: 'right' });
+                const { employee, salary } = currentPayslipData;
+                const monthName = new Date(salary.month + '-01').toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
+                
+                // Set margins
+                const leftMargin = 15;
+                const rightMargin = 195;
+                const pageWidth = 210;
+                
+                // Header with company logo area
+                doc.setFillColor(240, 248, 255);
+                doc.rect(0, 0, pageWidth, 45, 'F');
+                
+                // Company name
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text(employee.company, pageWidth/2, 15, { align: 'center' });
+                
+                // Address
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.text('Jalan Rahayu No. 33D RT/RW. 009/004. Kode Pos. 70613', pageWidth/2, 22, { align: 'center' });
+                doc.text('Kel. Sungai Paring Kec. Martapura Kab. Banjar Provinsi Kalimantan Selatan', pageWidth/2, 27, { align: 'center' });
+                
+                // Title
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.text('SLIP GAJI KARYAWAN', pageWidth/2, 35, { align: 'center' });
+                
+                // Period
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Periode: ${monthName}`, pageWidth/2, 42, { align: 'center' });
+                
+                // July 2025 notice
+                let currentY = 55;
+                if (salary.isJuly2025) {
+                    doc.setFontSize(10);
+                    doc.setTextColor(255, 140, 0);
+                    doc.text('* Khusus Juli 2025: Tanpa Potongan BPJS', pageWidth/2, currentY, { align: 'center' });
+                    doc.setTextColor(0, 0, 0);
+                    currentY += 10;
+                }
+                
+                // Employee Information Section
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.text('INFORMASI KARYAWAN', leftMargin, currentY);
+                doc.line(leftMargin, currentY + 2, rightMargin, currentY + 2);
+                currentY += 10;
+                
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                
+                // Left column
+                doc.text(`Nama Lengkap: ${employee.fullName}`, leftMargin, currentY);
+                doc.text(`Jabatan: ${employee.position}`, leftMargin, currentY + 6);
+                doc.text(`NIK: ${employee.nik}`, leftMargin, currentY + 12);
+                doc.text(`Status PTKP: ${employee.ptkpStatus}`, leftMargin, currentY + 18);
+                doc.text(`NPWP: ${employee.npwp || 'Tidak Ada'}`, leftMargin, currentY + 24);
+                
+                // Right column
+                doc.text(`Bank: ${employee.bankName}`, 110, currentY);
+                doc.text(`No. Rekening: ${employee.accountNumber}`, 110, currentY + 6);
+                doc.text(`PPh 21: ${salary.pph21Status === 'yes' ? 'Berlaku' : 'Tidak Berlaku'}`, 110, currentY + 12);
+                doc.text(`Email: ${employee.email || '-'}`, 110, currentY + 18);
+                
+                currentY += 35;
+                
+                // Salary Details Table
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.text('RINCIAN GAJI', leftMargin, currentY);
+                doc.line(leftMargin, currentY + 2, rightMargin, currentY + 2);
+                currentY += 10;
+                
+                // Table headers
+                doc.setFillColor(245, 245, 245);
+                doc.rect(leftMargin, currentY - 5, rightMargin - leftMargin, 8, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.text('KETERANGAN', leftMargin + 2, currentY);
+                doc.text('JUMLAH (Rp)', rightMargin - 2, currentY, { align: 'right' });
+                doc.line(leftMargin, currentY + 2, rightMargin, currentY + 2);
+                currentY += 10;
+                
+                // Income section
+                doc.setFont('helvetica', 'bold');
+                doc.setFillColor(220, 255, 220);
+                doc.rect(leftMargin, currentY - 3, rightMargin - leftMargin, 6, 'F');
+                doc.text('PENGHASILAN', leftMargin + 2, currentY);
+                currentY += 8;
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text('Gaji Pokok', leftMargin + 5, currentY);
+                doc.text(formatCurrency(salary.basicSalary), rightMargin - 2, currentY, { align: 'right' });
+                currentY += 6;
+                
+                doc.text('Tunjangan Tetap', leftMargin + 5, currentY);
+                doc.text(formatCurrency(salary.allowance), rightMargin - 2, currentY, { align: 'right' });
+                currentY += 6;
+                
+                doc.text('Bonus/Lembur', leftMargin + 5, currentY);
+                doc.text(formatCurrency(salary.bonus), rightMargin - 2, currentY, { align: 'right' });
+                currentY += 8;
+                
+                // Gross salary
+                doc.setFont('helvetica', 'bold');
+                doc.line(leftMargin + 5, currentY - 2, rightMargin - 2, currentY - 2);
+                doc.text('Total Penghasilan Bruto', leftMargin + 5, currentY);
+                doc.text(formatCurrency(salary.calculations.grossSalary), rightMargin - 2, currentY, { align: 'right' });
+                currentY += 10;
+                
+                // Deductions section
+                doc.setFillColor(255, 220, 220);
+                doc.rect(leftMargin, currentY - 3, rightMargin - leftMargin, 6, 'F');
+                doc.text('POTONGAN', leftMargin + 2, currentY);
+                currentY += 8;
+                
+                doc.setFont('helvetica', 'normal');
+                
+                if (!salary.isJuly2025) {
+                    doc.text('BPJS JHT (2%)', leftMargin + 5, currentY);
+                    doc.text(`(${formatCurrency(salary.calculations.jht)})`, rightMargin - 2, currentY, { align: 'right' });
+                    currentY += 6;
+                    
+                    doc.text('BPJS Kesehatan (1%)', leftMargin + 5, currentY);
+                    doc.text(`(${formatCurrency(salary.calculations.health)})`, rightMargin - 2, currentY, { align: 'right' });
+                    currentY += 6;
+                } else {
+                    doc.text('BPJS (Khusus Juli 2025)', leftMargin + 5, currentY);
+                    doc.text('Rp 0', rightMargin - 2, currentY, { align: 'right' });
+                    currentY += 6;
+                }
+                
+                doc.text(`PPh 21 ${salary.pph21Status === 'yes' ? '' : '(Tidak Berlaku)'}`, leftMargin + 5, currentY);
+                doc.text(salary.pph21Status === 'yes' ? `(${formatCurrency(salary.calculations.pph21)})` : 'Rp 0', rightMargin - 2, currentY, { align: 'right' });
+                currentY += 6;
+                
+                // Employee debts
+                const employeeDebts = debts.filter(d => d.employeeId === employee.id && d.status === 'aktif');
+                employeeDebts.forEach(debt => {
+                    doc.text(`Hutang: ${debt.name}`, leftMargin + 5, currentY);
+                    doc.text(`(${formatCurrency(debt.amount)})`, rightMargin - 2, currentY, { align: 'right' });
+                    currentY += 6;
+                });
+                
+                // Total deductions
+                currentY += 2;
+                doc.setFont('helvetica', 'bold');
+                doc.line(leftMargin + 5, currentY - 2, rightMargin - 2, currentY - 2);
+                doc.text('Total Potongan', leftMargin + 5, currentY);
+                doc.text(`(${formatCurrency(salary.calculations.totalDeduction)})`, rightMargin - 2, currentY, { align: 'right' });
+                currentY += 10;
+                
+                // Take Home Pay
+                doc.setFillColor(220, 255, 255);
+                doc.rect(leftMargin, currentY - 5, rightMargin - leftMargin, 10, 'F');
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text('TAKE HOME PAY', leftMargin + 2, currentY);
+                doc.text(formatCurrency(salary.calculations.takeHomePay), rightMargin - 2, currentY, { align: 'right' });
+                doc.line(leftMargin, currentY + 2, rightMargin, currentY + 2);
+                currentY += 20;
+                
+                // Footer
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Martapura, ${new Date().toLocaleDateString('id-ID')}`, rightMargin - 2, currentY, { align: 'right' });
+                currentY += 15;
+                
+                doc.text('HRD Department', rightMargin - 2, currentY, { align: 'right' });
+                currentY += 5;
+                doc.text(employee.company, rightMargin - 2, currentY, { align: 'right' });
+                
+                // Digital signature notice
+                currentY += 15;
+                doc.setFontSize(8);
+                doc.setTextColor(128, 128, 128);
+                doc.text('Dokumen ini dibuat secara digital dan sah tanpa tanda tangan basah', pageWidth/2, currentY, { align: 'center' });
+                doc.text(`Generated on: ${new Date().toLocaleString('id-ID')} | ID: ${salary.id}`, pageWidth/2, currentY + 4, { align: 'center' });
+                
+                // Save PDF
+                const fileName = `Slip_Gaji_${employee.fullName.replace(/\s+/g, '_')}_${salary.month}.pdf`;
+                doc.save(fileName);
+                
+                showMessage('PDF slip gaji berhasil didownload!', 'success');
+                
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                showMessage('Terjadi kesalahan saat membuat PDF. Silakan coba lagi.', 'error');
             }
-            
-            y += 8;
-            doc.text(`PPh 21 ${salary.pph21Status === 'yes' ? '' : '(Tidak Berlaku)'}`, 20, y);
-            doc.text(salary.pph21Status === 'yes' ? `(${formatCurrency(salary.calculations.pph21)})` : 'Rp 0', 150, y, { align: 'right' });
-            
-            // Add debts if any
-            const employeeDebts = debts.filter(d => d.employeeId === employee.id && d.status === 'aktif');
-            employeeDebts.forEach(debt => {
-                y += 8;
-                doc.text(`Hutang: ${debt.name}`, 20, y);
-                doc.text(`(${formatCurrency(debt.amount)})`, 150, y, { align: 'right' });
-            });
-            
-            y += 10;
-            doc.setFont(undefined, 'bold');
-            doc.text('Total Potongan', 20, y);
-            doc.text(`(${formatCurrency(salary.calculations.totalDeduction)})`, 150, y, { align: 'right' });
-            doc.line(20, y + 2, 190, y + 2);
-            
-            y += 15;
-            doc.setFontSize(12);
-            doc.text('TAKE HOME PAY', 20, y);
-            doc.text(formatCurrency(salary.calculations.takeHomePay), 150, y, { align: 'right' });
-            doc.line(20, y + 2, 190, y + 2);
-            
-            // Footer
-            y += 30;
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            doc.text(`Martapura, ${new Date().toLocaleDateString('id-ID')}`, 150, y, { align: 'right' });
-            y += 20;
-            doc.text('HRD Department', 150, y, { align: 'right' });
-            doc.text(employee.company, 150, y + 8, { align: 'right' });
-            
-            // Save PDF
-            const fileName = `Slip_Gaji_${employee.fullName.replace(/\s+/g, '_')}_${salary.month}.pdf`;
-            doc.save(fileName);
-            
-            showMessage('PDF berhasil didownload!', 'success');
         }
 
         function sendEmail() {
@@ -2384,5 +2468,5 @@
             }, 5000);
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'968241ffa4acfd2f',t:'MTc1NDAxOTAzNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9682768ac0945fe7',t:'MTc1NDAyMTE4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
