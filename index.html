@@ -1553,27 +1553,29 @@
 
             // Calculate PPh21 based on status
             let pph21Monthly = 0;
+            let yearlyNet = 0;
+            let pkp = 0;
             
             if (pph21Status === 'yes') {
                 // Calculate net income for PPh21
                 const monthlyNet = grossSalary - totalBpjs;
-                const yearlyNet = monthlyNet * 12;
+                yearlyNet = monthlyNet * 12;
 
                 // Get employee PTKP and NPWP status
                 const employeeId = document.getElementById('salaryEmployee').value;
-                let ptkp = 54000000; // Default TK/0
+                let ptkp_value = 54000000; // Default TK/0
                 let hasNpwp = false;
 
                 if (employeeId) {
                     const employee = employees.find(emp => emp.id == employeeId);
                     if (employee) {
-                        ptkp = ptkpValues[employee.ptkpStatus] || 54000000;
+                        ptkp_value = ptkpValues[employee.ptkpStatus] || 54000000;
                         hasNpwp = employee.npwp && employee.npwp.trim() !== '';
                     }
                 }
 
                 // Calculate PKP (Penghasilan Kena Pajak)
-                const pkp = Math.max(0, yearlyNet - ptkp);
+                pkp = Math.max(0, yearlyNet - ptkp_value);
 
                 // Calculate PPh21
                 let pph21Annual = 0;
@@ -1595,11 +1597,17 @@
                 }
 
                 pph21Monthly = pph21Annual / 12;
+            } else {
+                // When PPh21 is not applicable, set all values to 0
+                pph21Monthly = 0;
+                yearlyNet = 0;
+                pkp = 0;
             }
 
             // Calculate employee debts
             let totalDebtAmount = 0;
             const debtBreakdown = document.getElementById('debtBreakdown');
+            const employeeId = document.getElementById('salaryEmployee').value;
             
             if (employeeId) {
                 const employeeDebts = debts.filter(d => d.employeeId == employeeId && d.status === 'aktif');
@@ -2384,5 +2392,5 @@
             }, 5000);
         }
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'968241ffa4acfd2f',t:'MTc1NDAxOTAzNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96825d5bf3549c87',t:'MTc1NDAyMDE1Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
